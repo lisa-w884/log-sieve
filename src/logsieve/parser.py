@@ -1,26 +1,37 @@
-"""Turn raw log lines into structured records using regex-based formats."""
+"""Turn raw log lines into structured records using named formats."""
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 
 @dataclass(frozen=True)
 class LogFormat:
-    """A named regex with named capture groups.
+    """A named way to turn one line of text into a dict, or reject it.
 
-    Field names come from the regex's group names rather than a separate
+    Most formats are a regex with named capture groups, in which case
+    field names come from the regex's group names rather than a separate
     list, so the pattern stays the single source of truth for what a
-    parsed record looks like.
+    parsed record looks like. Formats that aren't line-oriented regexes
+    (JSON lines, say) can instead supply a `parse` callable that takes a
+    line and returns a dict or None.
     """
 
     name: str
-    pattern: re.Pattern
+    pattern: Optional[re.Pattern] = None
+    parse: Optional[Callable[[str], Optional[Dict[str, Any]]]] = None
+
+    def __post_init__(self):
+        if self.pattern is None and self.parse is None:
+            raise ValueError("LogFormat needs either a pattern or a parse function")
 
     @property
     def fields(self):
+        if self.pattern is None:
+            return ()
         return tuple(self.pattern.groupindex.keys())
 
 
@@ -45,9 +56,41 @@ TIMESTAMP_LEVEL_FORMAT = compile_format(
     r"(?P<level>[A-Z]+) (?P<message>.*)$",
 )
 
+# RFC 3164 style syslog, e.g.:
+# <34>Oct 11 22:14:15 mymachine su[1234]: 'su root' failed for lonvick
+# The <34> priority prefix is optional since plenty of syslog consumers
+# (journald forwarders, docker log drivers) strip it before writing to disk.
+SYSLOG_FORMAT = compile_format(
+    "syslog",
+    r"^(?:<(?P<priority>\d{1,3})>)?"
+    r"(?P<timestamp>[A-Z][a-z]{2}\s+\d{1,2}\s\d{2}:\d{2}:\d{2})\s"
+    r"(?P<host>\S+)\s"
+    r"(?P<tag>[^:\s]+):\s(?P<message>.*)$",
+)
 
-def parse_line(line: str, fmt: LogFormat) -> Optional[Dict[str, str]]:
+
+def _parse_json_line(line: str) -> Optional[Dict[str, Any]]:
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        obj = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return obj if isinstance(obj, dict) else None
+
+
+# JSON-lines logs, one JSON object per line, e.g. what most structured
+# loggers (structlog, pino, zap in JSON mode) emit by default. There's no
+# regex here since the field set is whatever keys the object happens to
+# have - `fields` on this format is always empty, unlike the regex ones.
+JSON_LINES_FORMAT = LogFormat(name="json_lines", parse=_parse_json_line)
+
+
+def parse_line(line: str, fmt: LogFormat) -> Optional[Dict[str, Any]]:
     """Match a single line against a format, returning its fields or None."""
+    if fmt.parse is not None:
+        return fmt.parse(line)
     match = fmt.pattern.match(line)
     if match is None:
         return None

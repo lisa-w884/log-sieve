@@ -1,5 +1,7 @@
 from .parser import (
     COMMON_LOG_FORMAT,
+    JSON_LINES_FORMAT,
+    SYSLOG_FORMAT,
     TIMESTAMP_LEVEL_FORMAT,
     LogFormat,
     compile_format,
@@ -10,6 +12,8 @@ from .reader import open_log_lines
 
 __all__ = [
     "COMMON_LOG_FORMAT",
+    "JSON_LINES_FORMAT",
+    "SYSLOG_FORMAT",
     "TIMESTAMP_LEVEL_FORMAT",
     "LogFormat",
     "compile_format",

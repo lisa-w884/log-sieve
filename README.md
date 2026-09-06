@@ -58,8 +58,11 @@ Built-in formats today:
 - `COMMON_LOG_FORMAT` - the Apache/nginx combined access log format
 - `TIMESTAMP_LEVEL_FORMAT` - generic `TIMESTAMP LEVEL message` lines, the
   kind most application loggers produce by default
+- `SYSLOG_FORMAT` - RFC 3164 style syslog (`<34>Oct 11 22:14:15 host tag: message`);
+  the `<priority>` prefix is optional since a lot of syslog forwarders strip it
+- `JSON_LINES_FORMAT` - one JSON object per line, whatever keys it has
 
-Define your own with `compile_format`:
+Define your own regex-based format with `compile_format`:
 
 ```python
 from logsieve import compile_format, parse_line
@@ -68,11 +71,16 @@ fmt = compile_format("csv3", r"^(?P<a>[^,]+),(?P<b>[^,]+),(?P<c>.+)$")
 parse_line("1,2,three", fmt)  # {'a': '1', 'b': '2', 'c': 'three'}
 ```
 
+Not every format fits a single regex - `JSON_LINES_FORMAT` is built from a
+plain `parse` function instead of a pattern. You can do the same for your
+own formats: `LogFormat(name="mine", parse=my_parse_fn)`, where `my_parse_fn`
+takes a line and returns a dict, or `None` to drop the line.
+
 ## Status
 
-Early skeleton. The reading and parsing core works and is tested; format
-coverage and higher-level tools (filtering, aggregation, CLI) are not
-built yet.
+Early skeleton. The reading and parsing core works and is tested, with a
+handful of built-in formats; higher-level tools (filtering, aggregation,
+rotation-aware reading, CLI) are not built yet.
 
 ## License
 
