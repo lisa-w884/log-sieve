@@ -1,3 +1,11 @@
+from .aggregate import (
+    count_by,
+    field_equals,
+    field_in,
+    field_matches,
+    filter_records,
+    group_by,
+)
 from .parser import (
     COMMON_LOG_FORMAT,
     JSON_LINES_FORMAT,
@@ -20,6 +28,12 @@ __all__ = [
     "parse_line",
     "parse_stream",
     "open_log_lines",
+    "filter_records",
+    "field_equals",
+    "field_in",
+    "field_matches",
+    "count_by",
+    "group_by",
 ]
 
 __version__ = "0.1.0"

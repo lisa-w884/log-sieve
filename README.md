@@ -76,11 +76,39 @@ plain `parse` function instead of a pattern. You can do the same for your
 own formats: `LogFormat(name="mine", parse=my_parse_fn)`, where `my_parse_fn`
 takes a line and returns a dict, or `None` to drop the line.
 
+Filtering and counting parsed records without buffering the whole stream:
+
+```python
+from logsieve import open_log_lines, parse_stream, filter_records, count_by, field_equals, TIMESTAMP_LEVEL_FORMAT
+
+records = parse_stream(open_log_lines("app.log"), TIMESTAMP_LEVEL_FORMAT)
+errors = filter_records(records, field_equals("level", "ERROR"))
+for record in errors:
+    print(record["timestamp"], record["message"])
+```
+
+```python
+records = parse_stream(open_log_lines("app.log"), TIMESTAMP_LEVEL_FORMAT)
+count_by(records, "level")  # Counter({'INFO': 8123, 'WARN': 41, 'ERROR': 3})
+```
+
+`filter_records` stays lazy, like `parse_stream` - it only pulls the next
+record when asked. `count_by` and `group_by` are terminal operations that
+consume the whole stream, but `count_by` only ever holds the running
+tallies in memory, not the records themselves, so it's still safe to run
+over a huge file. `group_by` has to keep every record it sees (a bucket
+isn't final until the stream ends), so it's meant for a filtered subset,
+not the whole firehose. Predicate builders for the common cases -
+`field_equals`, `field_in`, `field_matches` - save you from writing a
+lambda for simple equality, membership, or regex checks; `count_by` and
+`group_by` also take a field name directly instead of a key function for
+the common "group by this one field" case.
+
 ## Status
 
-Early skeleton. The reading and parsing core works and is tested, with a
-handful of built-in formats; higher-level tools (filtering, aggregation,
-rotation-aware reading, CLI) are not built yet.
+The reading, parsing, filtering, and counting core works and is tested,
+with a handful of built-in formats; rotation-aware multi-file reading,
+follow mode, and CSV export are not built yet.
 
 ## License
 
